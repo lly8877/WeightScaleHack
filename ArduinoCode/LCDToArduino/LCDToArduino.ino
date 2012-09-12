@@ -287,12 +287,14 @@ void printDot()
 
 void print_real_numbers()
 {
+  Serial.print('<');
   printDigitFromLED(4);
   printDigitFromLED(3);
   printDigitFromLED(2);
   printDigitFromLED(1);
   printDot();
   printDigitFromLED(0);
+  Serial.print('>');
 }
 
 int readNumberFromLCD(int digit)
@@ -336,13 +338,14 @@ int readNumberFromLCDLOW(int startSEG)
   digital_ordered[5] = level_avg_SEG[1][startSEG];
   digital_ordered[6] = level_avg_SEG[0][startSEG+1];
   
-
+  /*
   Serial.print('<');
   for (int i = 0; i<7; i++)
   {
     Serial.print(digital_ordered[i]);
   }
   Serial.println('>');
+  */
   
   int result = 0;
   for (; result < 11; result++)
