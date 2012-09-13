@@ -287,14 +287,13 @@ void printDot()
 
 void print_real_numbers()
 {
-  Serial.print('<');
+  Serial.print("weight: ");
   printDigitFromLED(4);
   printDigitFromLED(3);
   printDigitFromLED(2);
   printDigitFromLED(1);
   printDot();
   printDigitFromLED(0);
-  Serial.print('>');
 }
 
 int readNumberFromLCD(int digit)
