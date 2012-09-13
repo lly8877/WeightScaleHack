@@ -85,7 +85,7 @@
 <p>测了两个管脚，大概是这样的波形：</p>
 
 <p><img src="http://farm9.staticflickr.com/8041/7978415718_88ec08e17c.jpg" alt="液晶屏管脚波形">
-这个结果和我最初想象的不一样，我以为这种液晶屏和七段式的LED数码管原理差不多，有一条线选择数字，另外七根线来用高低控制液晶。可是这里液晶屏的电压是阶梯状的，和LED显示屏很不一样。这里找到一个液晶控制芯片的<a href="http://www.atmel.com/Images/doc2530.pdf">datasheet</a>很有帮助，里边讲了这种液晶屏的工作原理。</p>
+这个结果和我最初想象的不一样，我以为这种液晶屏和七段式的LED数码管原理差不多，有一条线选择数字，另外七根线来用高低控制液晶。可是这里液晶屏的电压是阶梯状的，和LED显示屏很不一样。这里找到一个液晶控制芯片的<a href="http://www.atmel.com/Images/doc2530.pdf">Datasheet</a>很有帮助，里边讲了这种液晶屏的工作原理。</p>
 
 <p>Datasheet里边讲的很清楚了，这张插图尤其说明问题</p>
 
@@ -148,6 +148,24 @@ weight: 76.3   </p>
 <p>到这里我们自己用单片机度数也就基本告一段落了，剩下还需要完善的地方还很多，比如平均的算法现在收敛的太慢，需要5秒，而且单片机还没有休眠机制（秤上的触碰开关没有利用上）。还有秤的结果校准问题也没有完全弄清楚。不过据我实际测试，至少每一次的误差都在0.1kg以内，核心的功能算是告一段落了。下边我们还是继续推进，让数字能够在本地显示，并且传到远程服务器绘制图表。</p>
 
 <p>未完待续</p>
+
+<hr><h3>参考资料</h3>
+
+<p>1.<a href="http://science.discovery.com/videos/deconstructed-digital-scale.html">数字体重计原理视频</a></p>
+
+<p>2.<a href="http://www.atmel.com/Images/doc2530.pdf">讲了液晶屏原理液晶屏驱动Datasheet</a></p>
+
+<p>3.<a href="http://www.ti.com/lit/ds/symlink/ads1232.pdf">TI 电桥传感器芯片ADS1234/1232</a> 和<a href="http://www.ti.com/lit/ml/slyp163/slyp163.pdf">参考电路设计</a></p>
+
+<hr><h3>代码和电路图 （都在项目目录下）</h3>
+
+<p>1.<a href="https://github.com/lly8877/WeightScaleHack/tree/master/EagleFiles/LCDToArduino">读LCD的辅助电路(Eagle文件)</a></p>
+
+<p>2.<a href="https://github.com/lly8877/WeightScaleHack/blob/master/ArduinoCode/LCDToArduino/LCDToArduino.ino">读LCD示数的Arduino程序</a></p>
+
+<p>3.<a href="https://github.com/lly8877/WeightScaleHack/blob/master/ArduinoCode/ReadADS1234/ReadADS1234.ino">读传感器的Arduino程序</a></p>
+
+<p>4.<a href="https://github.com/lly8877/WeightScaleHack/blob/master/Matlab/analysisADS1234Data.m">分析数据的MatLab程序</a></p>
         </section>
 
         <footer>
