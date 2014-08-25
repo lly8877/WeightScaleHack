@@ -1,0 +1,54 @@
+ local impID = "longyi";
+// Arduino Pro Mini To Imp UART
+local UART = hardware.uart57;
+local sent = 0;
+
+local outputPort = OutputPort("IdAndWeight", "string");
+local lastReceived = "";
+function forward()
+{       
+    local WeightString = "";
+   // write a byte
+    //hardware.uart12.write(0x01);
+    //server.log("wrote something");
+    
+    local b = UART.read();
+    local a = 0;
+    while(b >= 0)
+    {
+        a = 1;
+        WeightString += format("%c",b);
+        b = UART.read();
+    }
+    
+    if (a && !sent)
+    {   
+        server.log(WeightString);
+        local stringToSend = impID+"_"+WeightString.slice(0,WeightString.len()-2);
+        if (stringToSend == lastReceived)
+        {
+            server.log(stringToSend);
+            outputPort.set(stringToSend);
+            imp.sleep(0.1);
+            sent = 1;
+        }
+        lastReceived = stringToSend;
+        //string = "0000";
+        // UART.write(0x76);
+        
+        /*
+        foreach (i,val in string)
+        {
+            UART.write(val);   
+        }
+        */
+    }
+    imp.wakeup(0.1, forward);
+    //server.sleepfor(100);
+}
+
+imp.configure("Arduino Pro Mini To Imp UART", [], [outputPort]);
+UART.configure(9600, 8, PARITY_NONE, 1, NO_CTSRTS);
+server.log("start listen !!!!");
+forward();
+
