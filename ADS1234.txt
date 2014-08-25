@@ -1,0 +1,287 @@
+// Wen's scale
+// read ADS1234 and display on LCD
+
+ local RATIO = (8895.0);
+ local OFFSET = (0);
+ local CODE_NAME = "Wen's Scale";
+ local impID = "wen";
+ local threshold = 0.5;
+ 
+ local outputPort = OutputPort("IdAndWeight", "string");
+ local CLOCK_PERIOD  = (0.000001);
+ local AVG_SIZE = 100;
+ 
+ local UART = hardware.uart57;
+ local POWERUP_PIN = hardware.pin2;
+ local CLOCK_PIN = hardware.pin8;
+ local DATA_PIN = hardware.pin7;
+ local A1_PIN = hardware.pin9;
+ 
+ 
+
+local number2_24 = 1.0;
+local record = array(AVG_SIZE);
+local throwAway = false;
+local result;
+// the loop routine runs over and over again forever:
+
+local bufferSum = 0;
+local currentBufferIndex = 0;
+local sum;
+
+function writeSend()
+{
+    UART.write(0x77);
+    UART.write(0x00);
+    UART.write('S');
+    UART.write('E');
+    UART.write('N');
+    UART.write('T');
+}
+
+function clearLED()
+{
+    UART.write(0x77);
+    UART.write(0x00);
+    UART.write(0x78);
+    UART.write(0x78);
+    UART.write(0x78);
+    UART.write(0x78);
+}
+
+function writeToLED(weightNumber)
+{
+    if (weightNumber < 10)
+    {
+        clearLED();
+        return;
+    }
+    local integerWeight = (weightNumber*10).tointeger();
+    local integerWeightString = (integerWeight%10000).tostring();
+    
+    local lengthOfString = integerWeightString.len();
+    UART.write(0x77);
+    UART.write(0x04);
+    
+    for(local i =0; i<4 - lengthOfString; i++)
+    {
+        UART.write(0x78);
+    }
+   
+    local t = 0;
+    foreach (i,val in integerWeightString)
+    {
+        UART.write(val);
+        t++;
+    }
+    
+    delay(0.1);
+    for (local i = 0; i<10;i++)
+    {
+        readWeightInLbSingleChannel();
+    }
+}
+
+function initBucket()
+{
+    for (local i = 0; i < AVG_SIZE; i++)
+    {
+        record[i] = i - (AVG_SIZE-1)/2.0;
+    }
+    bufferSum = 0;
+}
+
+function setup()
+{
+    initBucket();
+    
+    imp.configure(CODE_NAME, [], [outputPort]);
+    UART.configure(9600, 8, PARITY_NONE, 1, NO_CTSRTS);
+    hardware.pin1.configure(DIGITAL_IN_WAKEUP);
+    POWERUP_PIN.configure(DIGITAL_OUT);
+    CLOCK_PIN.configure(DIGITAL_OUT);
+    DATA_PIN.configure(DIGITAL_IN);
+    A1_PIN.configure(DIGITAL_OUT);
+    server.log("ready!");
+    
+    CLOCK_PIN.write(0);
+    for (local i=1; i<24; i++)
+    {
+        number2_24 *= 2;
+    }
+    A1_PIN.write(0);
+    POWERUP_PIN.write(1);
+    
+    UART.write(0x76);
+}
+
+function delay(time)
+{
+    imp.sleep(time);
+}
+
+function digitalRead(pin)
+{
+    return pin.read();
+}
+
+function read_one_digit()
+{
+  CLOCK_PIN.write(1);
+  delay(CLOCK_PERIOD);
+  CLOCK_PIN.write(0);
+  delay(CLOCK_PERIOD);
+  local cur_digit = digitalRead(DATA_PIN);
+  return (cur_digit == 1);
+}
+
+function read24digit()
+{
+  waitUntilDataReady();
+  local number = 0;
+  for (local i=0; i<24; i++)
+  {
+    number = number*2;
+    if(read_one_digit())
+    {
+      number += 1;
+    }
+  }
+  // dummy read
+  read_one_digit();
+
+  if (number > 0x7FFFFF)
+  {
+    number = number - 0x1000000;
+  }
+  return number;
+}
+
+function waitUntilDataReady()
+{
+  local isReady;
+  do
+  {
+    isReady = digitalRead(DATA_PIN);
+  }
+  while(isReady)
+    delay(CLOCK_PERIOD);
+}
+
+local debugCount = 0;
+local debugString = "";
+
+function readWeightInLbSingleChannel()
+{
+    result = read24digit();
+    local weightInLb = result/RATIO + OFFSET;
+    // server.log(format("%d, %f",result, weightInLb));
+    
+    debugString += format("%f, ",weightInLb);
+    
+    debugCount ++;
+    if(debugCount == 100)
+    {
+        debugCount = 0;
+        // server.log(debugString);
+        debugString = "";
+    }
+    
+    return weightInLb;
+}
+
+local last = 0;
+local needToSend = 0;
+function main()
+{
+    imp.sleep(0.01);    
+    local weightInLb = readWeightInLbSingleChannel();
+    if (last != 0)
+    {
+        if (weightInLb - last > 2 || weightInLb - last < -2)
+        {
+            // might need throw
+            if (!throwAway)
+            {
+                throwAway = true;
+                imp.wakeup(0.001, main);
+                return;
+            }
+        }
+    }
+    
+    throwAway = false;
+    last = weightInLb;
+    local oldData = record[currentBufferIndex];
+    record[currentBufferIndex] = weightInLb;
+    
+    bufferSum -= oldData;
+    bufferSum += weightInLb;
+    if (currentBufferIndex == AVG_SIZE - 1)
+    {
+        currentBufferIndex = 0;
+    }
+    else
+    {
+        currentBufferIndex ++;
+    }
+    
+    local cur_var = variance();
+    if (cur_var < threshold)
+    {
+        local final = bufferSum/AVG_SIZE;
+        initBucket();
+        getWeight(final, cur_var);
+    }
+    imp.wakeup(0.001, main);
+}
+
+local sendState = 0;   // ready to send
+
+// 0 init, show nothing, waiting user to step on
+// 1 user stepped on, showing "Wen"
+// 2 stabled, number is sent, need to step off, (showing the number now)
+
+function getWeight(weight, var)
+{
+    writeToLED(weight);
+    if (weight > 30)
+    {
+        if (sendState == 0)
+        {
+            sendState = 2;
+            local stringToSend = impID+"_"+weight.tostring();
+            outputPort.set(stringToSend);
+            server.log("weight sent: " + stringToSend + " var: "+ var);
+        }
+    }
+    else
+    {
+        if (sendState == 2)
+        {
+            sendState = 0;
+            server.log(" data cleaned");
+        }
+    }
+}
+
+local var = 0;
+local cur_var = 0;
+
+function variance()
+{
+    var = 0;
+    for (local i = 0; i < AVG_SIZE; i++)
+    {
+        cur_var = record[i] - bufferSum/AVG_SIZE;
+        cur_var *= cur_var;
+        var += cur_var;
+    }
+    var /= AVG_SIZE;
+    //server.log(var);
+    return var;
+}
+
+setup();
+main();
+
